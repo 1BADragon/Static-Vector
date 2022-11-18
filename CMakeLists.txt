@@ -1,12 +1,15 @@
 cmake_minimum_required(VERSION 3.24)
 
 project(
-    NAME StaticVector
+    StaticVector
     VERSION 0.1.0
     DESCRIPTION "Vector like container with static memroy allocation"
+    LANGUAGES CXX
 )
 
-add_library(svector INTERFACE)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+add_library(svector INTERFACE "include/staticvector.hpp")
 target_include_directories(svector INTERFACE include/)
 set_target_properties(svector
     PROPERTIES

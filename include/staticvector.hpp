@@ -23,13 +23,13 @@ public:
         iterator& operator=(const iterator &it) = default;
         iterator& operator=(iterator &&it) = default;
 
-        bool operator ==(const iterator &it)
+        bool operator ==(const iterator &it) const
         {
             return (_parent == it._parent) &&
                 (_index == it._index);
         }
 
-        bool operator !=(const iterator &it)
+        bool operator !=(const iterator &it) const
         {
             return (_parent != it._parent) ||
                 (_index != it._index);
@@ -87,9 +87,13 @@ public:
 
         iterator& operator+=(difference_type n)
         {
+            if (n < 0) {
+                return (*this) -= -n;
+            }
+
             difference_type amnt = std::min(
                     _parent->size() - _index,
-                    n);
+                    static_cast<std::size_t>(n));
 
             _index += amnt;
             return *this;
@@ -105,7 +109,12 @@ public:
 
         iterator& operator-=(difference_type n)
         {
-            difference_type amnt = std::min(_index, n);
+            if (n < 0) {
+                return (*this) += -n;
+            }
+
+            difference_type amnt = std::min(_index,
+                    static_cast<std::size_t>(n));
 
             _index -= amnt;
             return *this;
@@ -124,22 +133,22 @@ public:
             return (*_parent)[_index + n];
         }
 
-        bool operator<(const iterator &it)
+        bool operator<(const iterator &it) const
         {
             return _index < it._index;
         }
 
-        bool operator>(const iterator &it)
+        bool operator>(const iterator &it) const
         {
             return _index > it._index;
         }
 
-        bool operator>=(const iterator &it)
+        bool operator>=(const iterator &it) const
         {
             return _index >= it._index;
         }
 
-        bool operator<=(const iterator &it)
+        bool operator<=(const iterator &it) const
         {
             return _index <= it._index;
         }
@@ -157,10 +166,228 @@ public:
         size_t _index;
     };
 
+    class const_iterator {
+    public:
+        using interator_category = std::contiguous_iterator_tag;
+        using difference_type    = std::ptrdiff_t;
+        using value_type         = const T;
+        using pointer            = const T*;
+        using reference          = const T&;
+
+        const_iterator(const const_iterator &it) = default;
+        const_iterator(const_iterator &&it) = default;
+        const_iterator& operator=(const const_iterator &it) = default;
+        const_iterator& operator=(const_iterator &&it) = default;
+
+        bool operator ==(const const_iterator &it) const
+        {
+            return (_parent == it._parent) &&
+                (_index == it._index);
+        }
+
+        bool operator !=(const const_iterator &it) const
+        {
+            return (_parent != it._parent) ||
+                (_index != it._index);
+        }
+
+        reference operator*()
+        {
+            return _parent->at(_index);
+        }
+
+        pointer operator->()
+        {
+            return &_parent->at(_index);
+        }
+
+        const_iterator& operator++()
+        {
+            if (_index < _parent->size()) {
+                _index++;
+            }
+
+            return *this;
+        }
+
+        const_iterator operator++(int)
+        {
+            iterator tmp = *this;
+
+            if (_index < _parent->size()) {
+                _index++;
+            }
+
+            return tmp;
+        }
+
+        const_iterator& operator--()
+        {
+            if (_index > 0) {
+                _index--;
+            }
+
+            return *this;
+        }
+
+        const_iterator& operator--(int)
+        {
+            const_iterator tmp = *this;
+
+            if (_index > 0) {
+                _index--;
+            }
+
+            return tmp;
+        }
+
+        const_iterator& operator+=(difference_type n)
+        {
+            if (n < 0) {
+                return (*this) -= -n;
+            }
+
+            difference_type amnt = std::min(
+                    _parent->size() - _index,
+                    static_cast<std::size_t>(n));
+
+            _index += amnt;
+            return *this;
+        }
+
+        const_iterator operator+(difference_type n)
+        {
+            const_iterator tmp = *this;
+
+            tmp += n;
+            return tmp;
+        }
+
+        const_iterator& operator-=(difference_type n)
+        {
+            if (n < 0) {
+                return (*this) += -n;
+            }
+
+            difference_type amnt = std::min(_index,
+                    static_cast<std::size_t>(n));
+
+            _index -= amnt;
+            return *this;
+        }
+
+        const_iterator operator-(difference_type n)
+        {
+            const_iterator tmp = *this;
+
+            tmp -= n;
+            return tmp;
+        }
+
+        reference operator[](difference_type n)
+        {
+            return (*_parent)[_index + n];
+        }
+
+        bool operator<(const const_iterator &it) const
+        {
+            return _index < it._index;
+        }
+
+        bool operator>(const const_iterator &it) const
+        {
+            return _index > it._index;
+        }
+
+        bool operator>=(const const_iterator &it) const
+        {
+            return _index >= it._index;
+        }
+
+        bool operator<=(const const_iterator &it) const
+        {
+            return _index <= it._index;
+        }
+
+    private:
+        friend StaticVector<T, S>;
+
+        const_iterator(const StaticVector<T, S> *parent, difference_type start = 0)
+            : _parent(parent), _index(start)
+        {
+
+        }
+
+        const StaticVector<T, S> *_parent;
+        size_t _index;
+    };
+
     StaticVector()
         : _underling(), _buffer(reinterpret_cast<T *>(_underling)), _size(0)
     {
 
+    }
+
+    StaticVector(const StaticVector<T, S> &other)
+        : StaticVector()
+    {
+        *this = other;
+    }
+
+    StaticVector(StaticVector<T, S> &&other)
+        : StaticVector()
+    {
+        *this = std::forward<StaticVector<T, S>>(other);
+    }
+
+    StaticVector(const T &val, std::size_t s = S)
+        : StaticVector()
+    {
+        for (std::size_t i = 0; i < s; ++i) {
+            push_back(val);
+        }
+    }
+
+    StaticVector(const std::initializer_list<T> &l)
+        : StaticVector()
+    {
+        for (auto &i : l) {
+            push_back(i);
+        }
+    }
+
+    StaticVector<T, S>& operator=(const std::initializer_list<T> &l)
+    {
+        clear();
+
+        for (const auto &i : l) {
+            push_back(i);
+        }
+
+        return *this;
+    }
+
+    StaticVector<T, S>& operator=(const StaticVector<T, S> &rhs)
+    {
+        clear();
+
+        for (auto it = rhs.cbegin(); it != rhs.cend(); ++it) {
+            push_back(*it);
+        }
+
+        return *this;
+    }
+
+    StaticVector<T, S>& operator=(StaticVector<T, S> &&rhs)
+    {
+        clear();
+
+        for (std::size_t i = 0; i < rhs.size(); ++i) {
+            push_back(std::move(rhs[i]));
+        }
+
+        rhs.clear();
+        return *this;
     }
 
     std::size_t size() const
@@ -197,7 +424,7 @@ public:
     {
         if (empty() || i >= _size) {
 #ifdef __cpp_exceptions
-            throw std::out_of_range();
+            throw std::out_of_range("StaticVector::at");
 #else
             abort();
 #endif
@@ -281,11 +508,13 @@ public:
     template<typename ...Args>
     void emplace_back(Args ...args)
     {
+        if (_size >= S) {
 #ifdef __cpp_exceptions
             throw std::length_error("push_back past StaticVector size");
 #else
             abort();
 #endif
+        }
 
         std::construct_at(&_buffer[_size], std::move(args)...);
         _size++;
@@ -303,12 +532,22 @@ public:
 
     iterator begin()
     {
-        return iterator(_parent);
+        return iterator(this);
     }
 
     iterator end()
     {
         return iterator(this, size());
+    }
+
+    const_iterator cbegin() const
+    {
+        return const_iterator(this);
+    }
+
+    const_iterator cend() const
+    {
+        return const_iterator(this, size());
     }
 
 private:
@@ -355,7 +594,7 @@ bool operator <(const StaticVector<T, S> &a, const StaticVector<T, S> &b)
     std::size_t max = std::min(a.size(), b.size());
 
     for (std::size_t i = 0; i < max; ++i) {
-        if (a[i] >= b[i]) {
+        if (a[i] < b[i]) {
             return true;
         }
     }
@@ -370,11 +609,11 @@ bool operator <=(const StaticVector<T, S> &a, const StaticVector<T, S> &b)
 
     for (std::size_t i = 0; i < max; ++i) {
         if (a[i] > b[i]) {
-            return true;
+            return false;
         }
     }
 
-    return b.size() > a.size();
+    return a.size() <= b.size();
 }
 
 template<typename T, std::size_t S>
@@ -383,12 +622,12 @@ bool operator >(const StaticVector<T, S> &a, const StaticVector<T, S> &b)
     std::size_t max = std::min(a.size(), b.size());
 
     for (std::size_t i = 0; i < max; ++i) {
-        if (a[i] <= b[i]) {
+        if (a[i] > b[i]) {
             return true;
         }
     }
 
-    return b.size() <= a.size();
+    return b.size() < a.size();
 }
 
 template<typename T, std::size_t S>
@@ -398,9 +637,9 @@ bool operator >=(const StaticVector<T, S> &a, const StaticVector<T, S> &b)
 
     for (std::size_t i = 0; i < max; ++i) {
         if (a[i] < b[i]) {
-            return true;
+            return false;
         }
     }
 
-    return b.size() < a.size();
+    return a.size() >= b.size();
 }
