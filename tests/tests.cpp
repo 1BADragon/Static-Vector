@@ -1,3 +1,4 @@
+#include <memory>
 #include <gtest/gtest.h>
 #include <staticvector.hpp>
 
@@ -189,4 +190,86 @@ TEST(StaticVector, constness)
     ASSERT_EQ(vec.back(), 4);
 
     ASSERT_EQ(vec.data()[2], 3);
+}
+
+TEST(StaticVector, insert)
+{
+    StaticVector<int, 32> vec = {1, 2, 3};
+    StaticVector<int, 32> expected;
+
+    vec.insert(vec.begin() + 1, 45);
+
+    expected = {1, 45, 2, 3};
+    ASSERT_EQ(vec, expected);
+
+    vec.insert(vec.begin() + 1, static_cast<std::size_t>(3), 42);
+    expected = {1, 42, 42, 42, 45, 2, 3};
+    ASSERT_EQ(vec, expected);
+
+    vec = {1, 2, 3};
+    vec.insert(vec.begin(), {3, 2, 1});
+    expected = {3, 2, 1, 1, 2, 3};
+    ASSERT_EQ(vec, expected);
+
+    vec = {1, 2, 3};
+    vec.insert(vec.end(), {4, 5, 6});
+    expected = {1, 2, 3, 4, 5, 6};
+    ASSERT_EQ(vec, expected);
+
+    vec = {};
+    vec.insert(vec.begin(), {1, 2, 3});
+    expected = {1, 2, 3};
+    ASSERT_EQ(vec, expected);
+}
+
+TEST(StaticVector, emplace)
+{
+    // unique_ptr is a nice non-copyable type to use
+    StaticVector<std::unique_ptr<int>, 16> vec;
+
+    auto ptr = std::make_unique<int>(42);
+
+    vec.emplace(vec.begin(), std::move(ptr));
+    ASSERT_EQ(*vec.at(0), 42);
+}
+
+TEST(StaticVector, erase)
+{
+    StaticVector<int, 16> vec = {1, 2, 3, 4, 5, 6, 7};
+    StaticVector<int, 16> expected;
+
+    vec.erase(vec.begin() + 2);
+    expected = {1, 2, 4, 5, 6, 7};
+    ASSERT_EQ(vec, expected);
+
+    vec = {1, 2, 3, 4, 5, 6, 7};
+    vec.erase(vec.begin(), vec.begin() + 4);
+    expected = {5, 6, 7};
+    ASSERT_EQ(vec, expected);
+
+    vec = {1, 2, 3, 4, 5, 6, 7};
+    vec.erase(vec.begin() + 4, vec.end());
+    expected = {1, 2, 3, 4};
+    ASSERT_EQ(vec, expected);
+
+    vec = {1, 2, 3, 4, 5, 6, 7};
+    vec.erase(vec.begin() + 2, vec.begin() + 5);
+    expected = {1, 2, 6, 7};
+    ASSERT_EQ(vec, expected);
+}
+
+TEST(StaticVector, assign)
+{
+    StaticVector<int, 16> vec;
+    StaticVector<int, 16> expected;
+
+    vec.assign(static_cast<std::size_t>(5), 42);
+    expected = {42, 42, 42, 42, 42};
+    ASSERT_EQ(vec, expected);
+
+    vec.assign(expected.begin(), expected.end());
+    ASSERT_EQ(vec, expected);
+
+    vec.assign({42, 42, 42, 42, 42});
+    ASSERT_EQ(vec, expected);
 }

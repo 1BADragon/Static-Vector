@@ -5,10 +5,16 @@
 #include <memory>
 #include <iterator>
 
+#ifdef STATICVEC_SUPPORT_IOSTREAM
+#include <ostream>
+#endif
+
 template<typename T, std::size_t S>
 class StaticVector {
 public:
     using value_type = T;
+
+    class const_iterator;
 
     class iterator {
     public:
@@ -176,6 +182,13 @@ public:
 
         const_iterator(const const_iterator &it) = default;
         const_iterator(const_iterator &&it) = default;
+
+        const_iterator(const iterator &it)
+            : _parent(it._parent), _index(it._index)
+        {
+
+        }
+
         const_iterator& operator=(const const_iterator &it) = default;
         const_iterator& operator=(const_iterator &&it) = default;
 
@@ -356,6 +369,11 @@ public:
         }
     }
 
+    ~StaticVector()
+    {
+        clear();
+    }
+
     StaticVector<T, S>& operator=(const std::initializer_list<T> &l)
     {
         clear();
@@ -388,6 +406,31 @@ public:
 
         rhs.clear();
         return *this;
+    }
+
+    void assign(std::size_t count, const T& value)
+    {
+        clear();
+
+        for (std::size_t i = 0; i < count; ++i) {
+            push_back(value);
+        }
+    }
+
+    template<typename InputIT>
+    void assign(InputIT first, InputIT back)
+    {
+        clear();
+
+        while (first != back) {
+            push_back(*first);
+            ++first;
+        }
+    }
+
+    void assign(std::initializer_list<T> ilist)
+    {
+        (*this) = ilist;
     }
 
     std::size_t size() const
@@ -472,9 +515,148 @@ public:
     void clear()
     {
         for (unsigned int i = 0; i < _size; ++i) {
-            std::destroy_at(&_buffer[i]);
+            std::destroy_at(std::addressof(_buffer[i]));
         }
         _size = 0;
+    }
+
+    iterator insert(const_iterator pos, const T& val)
+    {
+        if (_size >= S) {
+#ifdef __cpp_exceptions
+            throw std::length_error("insert past StaticVector size");
+#else
+            abort();
+#endif
+        }
+
+        shift_back(pos._index);
+        std::construct_at(&_buffer[pos._index], val);
+        _size++;
+        return iterator(this, pos._index);
+    }
+
+    iterator insert(const_iterator pos, T&& val)
+    {
+        if (_size >= S) {
+#ifdef __cpp_exceptions
+            throw std::length_error("insert past StaticVector size");
+#else
+            abort();
+#endif
+        }
+
+        shift_back(pos._index);
+        std::construct_at(&_buffer[pos._index], std::forward<T>(val));
+        _size++;
+        return iterator(this, pos._index);
+    }
+
+    iterator insert(const_iterator pos, std::size_t count, const T& value)
+    {
+        if (0 == count) {
+            return iterator(this, pos._index);
+        }
+
+        if (_size + count > S) {
+#ifdef __cpp_exceptions
+            throw std::length_error("insert past StaticVector size");
+#else
+            abort();
+#endif
+        }
+
+        shift_back(pos._index, count);
+        for (std::size_t i = 0; i < count; ++i) {
+            std::construct_at(&_buffer[pos._index + i], value);
+        }
+
+        _size += count;
+        return iterator(this, pos._index);
+    }
+
+    template<typename IT>
+    iterator insert(const_iterator pos, IT first, IT last)
+    {
+        std::size_t count = std::distance(first, last);
+
+        if (0 == count) {
+            return iterator(this, pos._index);
+        }
+
+        if (_size + count > S) {
+#ifdef __cpp_exceptions
+            throw std::length_error("insert past StaticVector size");
+#else
+            abort();
+#endif
+        }
+
+        shift_back(pos._index, count);
+        std::size_t index = 0;
+        while (first != last) {
+            std::construct_at(&_buffer[pos._index + index], *first);
+            first++;
+            index++;
+        }
+
+        _size += count;
+
+        return iterator(this, pos._index);
+    }
+
+    iterator insert(const_iterator pos, std::initializer_list<T> l)
+    {
+        return insert(pos, l.begin(), l.end());
+    }
+
+    template<typename ...Args>
+    iterator emplace(const_iterator pos, Args&& ...args)
+    {
+        if (_size >= S) {
+#ifdef __cpp_exceptions
+            throw std::length_error("insert past StaticVector size");
+#else
+            abort();
+#endif
+        }
+
+        shift_back(pos._index);
+        std::construct_at(&_buffer[pos._index], std::forward<Args>(args)...);
+        _size++;
+        return iterator(this, pos._index);
+    }
+
+    iterator erase(const_iterator pos)
+    {
+        if (pos == this->cend()) {
+            return this->end();
+        }
+
+        return erase(pos, pos+1);
+    }
+
+    iterator erase(const_iterator first, const_iterator last)
+    {
+        if (first._index >= last._index) {
+            return this->end();
+        }
+
+        std::size_t dist = std::min(last._index, _size) - first._index;
+        std::size_t dst = first._index;
+        std::size_t src = dst + dist;
+
+        while (dst < _size) {
+            _buffer[dst] = std::move(_buffer[src]);
+
+            std::destroy_at(&_buffer[src]);
+
+            ++src;
+            ++dst;
+        }
+
+        _size -= dist;
+        return iterator(this, first._index);
     }
 
     void push_back(const T &t)
@@ -554,6 +736,36 @@ private:
     uint8_t _underling[sizeof(T) * S];
     T* _buffer;
     std::size_t _size;
+
+    void shift_back(std::size_t at, std::size_t amnt = 1)
+    {
+        if (0 == _size) {
+            return;
+        }
+
+        std::size_t new_size = _size + amnt;
+        std::size_t shift_size = new_size - at;
+
+        std::size_t src = _size - 1;
+        std::size_t dst = new_size - 1;
+
+        while (src >= at) {
+            std::construct_at(&_buffer[dst],
+                              std::move(_buffer[src]));
+
+            std::destroy_at(&_buffer[src]);
+
+            // If src is 0 then subtracting will underflow the unsigned int
+            if (src == 0) {
+                break;
+            }
+
+            dst--;
+            src--;
+        }
+    }
+
+
 };
 
 template<typename T, std::size_t S>
@@ -643,3 +855,24 @@ bool operator >=(const StaticVector<T, S> &a, const StaticVector<T, S> &b)
 
     return a.size() >= b.size();
 }
+
+#ifdef STATICVEC_SUPPORT_IOSTREAM
+template<typename T, std::size_t S>
+std::ostream& operator<<(std::ostream &os, const StaticVector<T, S> &vec)
+{
+    bool first = true;
+    os << "{";
+    for (auto it = vec.cbegin(); it != vec.cend(); ++it) {
+        if (!first) {
+            os << ", ";
+        } else {
+            first = false;
+        }
+
+        os << *it;
+    }
+
+    os << "}";
+    return os;
+}
+#endif
