@@ -732,6 +732,24 @@ public:
         return const_iterator(this, size());
     }
 
+    iterator find(const T& val)
+    {
+        return find(begin(), val);
+    }
+
+    iterator find(const_iterator start, const T& val)
+    {
+        auto end = this->end();
+
+        while(start != end) {
+            if (*start == val) {
+                return iterator(this, start._index);
+            }
+        }
+
+        return this->end();
+    }
+
 private:
     uint8_t _underling[sizeof(T) * S];
     T* _buffer;
