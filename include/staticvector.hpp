@@ -750,6 +750,23 @@ public:
         return this->end();
     }
 
+    template<std::size_t R=S>
+    StaticVector<T, R> splitoff(const_iterator at)
+    {
+        StaticVector<T, R> res;
+
+        for (std::size_t i = 0; i < R; ++i) {
+            if (at == end()) {
+                break;
+            }
+
+            res[i] = *at;
+            ++at;
+        }
+
+        return res;
+    }
+
 private:
     uint8_t _underling[sizeof(T) * S];
     T* _buffer;
