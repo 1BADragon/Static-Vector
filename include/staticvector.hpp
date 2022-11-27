@@ -225,7 +225,7 @@ public:
 
         const_iterator operator++(int)
         {
-            iterator tmp = *this;
+            const_iterator tmp = *this;
 
             if (_index < _parent->size()) {
                 _index++;
@@ -745,6 +745,8 @@ public:
             if (*start == val) {
                 return iterator(this, start._index);
             }
+
+            start++;
         }
 
         return this->end();
